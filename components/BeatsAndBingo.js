@@ -1,27 +1,21 @@
 'use client'
 
 import React, { useState, useEffect } from 'react';
-import { Music, Users, Settings, Play, Pause, RotateCcw, Trophy, Volume2, UserPlus, Grid3X3, MessageCircle } from 'lucide-react';
+import { Music, Users, Settings, Play, Pause, RotateCcw, Trophy, Volume2, Grid3X3, MessageCircle, Plus, Save } from 'lucide-react';
 
 const BeatsAndBingo = () => {
   const [currentView, setCurrentView] = useState('login');
   const [userType, setUserType] = useState('user');
   const [playerName, setPlayerName] = useState('');
   const [sessionId, setSessionId] = useState('');
-  const [gameState, setGameState] = useState('waiting');
+  const [currentUser, setCurrentUser] = useState({ uid: 'demo-user' });
+  const [sessionData, setSessionData] = useState(null);
   const [selectedCells, setSelectedCells] = useState(new Set());
-  const [currentSong, setCurrentSong] = useState(null);
-  const [players, setPlayers] = useState([]);
+  const [bingoCard, setBingoCard] = useState(null);
+  const [hasBingo, setHasBingo] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  // Sample bingo card data
-  const [bingoCard] = useState([
-    ['Bohemian Rhapsody', 'Queen', 'Sweet Child O Mine', 'GNR', 'Hotel California'],
-    ['The Eagles', 'Stairway to Heaven', 'Led Zeppelin', 'Purple Haze', 'Jimi Hendrix'],
-    ['Back in Black', 'AC/DC', '🎵 FREE 🎵', 'Don\'t Stop Believin\'', 'Journey'],
-    ['Livin\' on a Prayer', 'Bon Jovi', 'More Than a Feeling', 'Boston', 'Tom Sawyer'],
-    ['Rush', 'Welcome to the Jungle', 'GNR', 'We Will Rock You', 'Queen']
-  ]);
-
+  // Admin data
   const [adminData, setAdminData] = useState({
     sessionName: '',
     maxPlayers: 10,
@@ -30,21 +24,199 @@ const BeatsAndBingo = () => {
     playlist: []
   });
 
+  // Sample playlists by genre
+  const genrePlaylists = {
+    rock: [
+      { id: 1, title: 'Bohemian Rhapsody', artist: 'Queen' },
+      { id: 2, title: 'Sweet Child O Mine', artist: 'Guns N\' Roses' },
+      { id: 3, title: 'Hotel California', artist: 'Eagles' },
+      { id: 4, title: 'Stairway to Heaven', artist: 'Led Zeppelin' },
+      { id: 5, title: 'Back in Black', artist: 'AC/DC' },
+      { id: 6, title: 'Don\'t Stop Believin\'', artist: 'Journey' },
+      { id: 7, title: 'Livin\' on a Prayer', artist: 'Bon Jovi' },
+      { id: 8, title: 'We Will Rock You', artist: 'Queen' },
+      { id: 9, title: 'Welcome to the Jungle', artist: 'Guns N\' Roses' },
+      { id: 10, title: 'Purple Haze', artist: 'Jimi Hendrix' },
+      { id: 11, title: 'More Than a Feeling', artist: 'Boston' },
+      { id: 12, title: 'Tom Sawyer', artist: 'Rush' },
+      { id: 13, title: 'Free Bird', artist: 'Lynyrd Skynyrd' },
+      { id: 14, title: 'Smoke on the Water', artist: 'Deep Purple' },
+      { id: 15, title: 'Paradise City', artist: 'Guns N\' Roses' },
+      { id: 16, title: 'American Pie', artist: 'Don McLean' },
+      { id: 17, title: 'Wish You Were Here', artist: 'Pink Floyd' },
+      { id: 18, title: 'Born to Run', artist: 'Bruce Springsteen' },
+      { id: 19, title: 'Thunderstruck', artist: 'AC/DC' },
+      { id: 20, title: 'Sweet Home Alabama', artist: 'Lynyrd Skynyrd' },
+      { id: 21, title: 'Layla', artist: 'Eric Clapton' },
+      { id: 22, title: 'Black', artist: 'Pearl Jam' },
+      { id: 23, title: 'Enter Sandman', artist: 'Metallica' },
+      { id: 24, title: 'Comfortably Numb', artist: 'Pink Floyd' },
+      { id: 25, title: 'Go Your Own Way', artist: 'Fleetwood Mac' }
+    ],
+    pop: [
+      { id: 26, title: 'Shake It Off', artist: 'Taylor Swift' },
+      { id: 27, title: 'Uptown Funk', artist: 'Bruno Mars' },
+      { id: 28, title: 'Shape of You', artist: 'Ed Sheeran' },
+      { id: 29, title: 'Blinding Lights', artist: 'The Weeknd' },
+      { id: 30, title: 'Levitating', artist: 'Dua Lipa' },
+      { id: 31, title: 'Anti-Hero', artist: 'Taylor Swift' },
+      { id: 32, title: 'As It Was', artist: 'Harry Styles' },
+      { id: 33, title: 'Bad Guy', artist: 'Billie Eilish' },
+      { id: 34, title: 'Watermelon Sugar', artist: 'Harry Styles' },
+      { id: 35, title: 'Good 4 U', artist: 'Olivia Rodrigo' }
+    ],
+    hiphop: [
+      { id: 51, title: 'God\'s Plan', artist: 'Drake' },
+      { id: 52, title: 'HUMBLE.', artist: 'Kendrick Lamar' },
+      { id: 53, title: 'Sicko Mode', artist: 'Travis Scott' },
+      { id: 54, title: 'Old Town Road', artist: 'Lil Nas X' },
+      { id: 55, title: 'Lose Yourself', artist: 'Eminem' },
+      { id: 56, title: 'Hotline Bling', artist: 'Drake' },
+      { id: 57, title: 'Congratulations', artist: 'Post Malone' },
+      { id: 58, title: 'Rockstar', artist: 'Post Malone ft. 21 Savage' },
+      { id: 59, title: 'Money Trees', artist: 'Kendrick Lamar' },
+      { id: 60, title: 'Sunflower', artist: 'Post Malone & Swae Lee' }
+    ]
+  };
+
+  // Generate bingo card
+  const generateBingoCard = (playlist) => {
+    const shuffled = [...playlist].sort(() => 0.5 - Math.random());
+    const card = [];
+    let index = 0;
+    
+    for (let row = 0; row < 5; row++) {
+      card[row] = [];
+      for (let col = 0; col < 5; col++) {
+        if (row === 2 && col === 2) {
+          card[row][col] = { type: 'free', text: '🎵 FREE 🎵' };
+        } else {
+          const song = shuffled[index] || { title: 'Song ' + (index + 1), artist: 'Artist' };
+          card[row][col] = {
+            type: 'song',
+            text: song.title,
+            artist: song.artist,
+            id: song.id || `song-${index}`
+          };
+          index++;
+        }
+      }
+    }
+    return card;
+  };
+
+  // Check for bingo
+  const checkForBingo = (selectedCells) => {
+    const patterns = [
+      // Rows
+      ['0-0', '0-1', '0-2', '0-3', '0-4'],
+      ['1-0', '1-1', '1-2', '1-3', '1-4'],
+      ['2-0', '2-1', '2-2', '2-3', '2-4'],
+      ['3-0', '3-1', '3-2', '3-3', '3-4'],
+      ['4-0', '4-1', '4-2', '4-3', '4-4'],
+      // Columns
+      ['0-0', '1-0', '2-0', '3-0', '4-0'],
+      ['0-1', '1-1', '2-1', '3-1', '4-1'],
+      ['0-2', '1-2', '2-2', '3-2', '4-2'],
+      ['0-3', '1-3', '2-3', '3-3', '4-3'],
+      ['0-4', '1-4', '2-4', '3-4', '4-4'],
+      // Diagonals
+      ['0-0', '1-1', '2-2', '3-3', '4-4'],
+      ['0-4', '1-3', '2-2', '3-1', '4-0']
+    ];
+    
+    return patterns.some(pattern => 
+      pattern.every(cell => selectedCells.has(cell))
+    );
+  };
+
+  // Demo session data
+  const createDemoSession = () => {
+    const playlist = genrePlaylists[adminData.genre] || genrePlaylists.rock;
+    return {
+      id: sessionId,
+      name: adminData.sessionName,
+      maxPlayers: adminData.maxPlayers,
+      genre: adminData.genre,
+      playlist,
+      currentSong: null,
+      players: {
+        'demo-user': {
+          id: 'demo-user',
+          name: playerName,
+          joinedAt: Date.now()
+        }
+      }
+    };
+  };
+
+  // Handle login
+  const handleLogin = async () => {
+    setLoading(true);
+    try {
+      if (userType === 'admin') {
+        setCurrentView('admin-setup');
+      } else {
+        // Create demo session for testing
+        const demoSession = createDemoSession();
+        setSessionData(demoSession);
+        setCurrentView('game');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      alert('Login failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle session creation
+  const handleCreateSession = async () => {
+    setLoading(true);
+    try {
+      const newSessionId = Math.random().toString(36).substring(2, 8).toUpperCase();
+      setSessionId(newSessionId);
+      const demoSession = createDemoSession();
+      setSessionData({...demoSession, id: newSessionId});
+      setCurrentView('admin-dashboard');
+    } catch (error) {
+      console.error('Session creation error:', error);
+      alert('Failed to create session. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle cell selection
   const toggleCell = (row, col) => {
     const cellId = `${row}-${col}`;
     const newSelected = new Set(selectedCells);
+    
     if (newSelected.has(cellId)) {
       newSelected.delete(cellId);
     } else {
       newSelected.add(cellId);
     }
+    
     setSelectedCells(newSelected);
+    setHasBingo(checkForBingo(newSelected));
   };
 
-  const checkBingo = () => {
-    // Simple bingo check logic (you'd expand this)
-    return selectedCells.size >= 5;
+  // Handle play song
+  const handlePlaySong = (song) => {
+    setSessionData(prev => ({
+      ...prev,
+      currentSong: song
+    }));
   };
+
+  // Generate bingo card when session data is available
+  useEffect(() => {
+    if (sessionData && sessionData.playlist && !bingoCard) {
+      const newCard = generateBingoCard(sessionData.playlist);
+      setBingoCard(newCard);
+    }
+  }, [sessionData, bingoCard]);
 
   // Login Screen
   const LoginScreen = () => (
@@ -99,26 +271,26 @@ const BeatsAndBingo = () => {
           {userType === 'user' && (
             <input
               type="text"
-              placeholder="Session ID"
+              placeholder="Session ID (e.g., ABC123)"
               value={sessionId}
-              onChange={(e) => setSessionId(e.target.value)}
+              onChange={(e) => setSessionId(e.target.value.toUpperCase())}
               className="w-full p-4 border border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
             />
           )}
 
           <button
-            onClick={() => setCurrentView(userType === 'admin' ? 'admin-setup' : 'game')}
-            disabled={!playerName || (userType === 'user' && !sessionId)}
+            onClick={handleLogin}
+            disabled={loading || !playerName || (userType === 'user' && !sessionId)}
             className="w-full bg-gradient-to-r from-purple-500 to-cyan-500 text-white py-4 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg transition-all transform hover:scale-105"
           >
-            {userType === 'admin' ? 'Create Session' : 'Join Game'}
+            {loading ? 'Loading...' : userType === 'admin' ? 'Create Session' : 'Join Game'}
           </button>
         </div>
       </div>
     </div>
   );
 
-  // User Game Screen
+  // Player Game Screen
   const GameScreen = () => (
     <div className="min-h-screen bg-gradient-to-br from-purple-100 to-cyan-100 p-4">
       <div className="max-w-lg mx-auto">
@@ -126,82 +298,97 @@ const BeatsAndBingo = () => {
         <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 mb-4 shadow-lg">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-gray-800">Session: {sessionId}</h2>
+              <h2 className="text-xl font-bold text-gray-800">Session: {sessionId || 'DEMO'}</h2>
               <p className="text-gray-600">Welcome, {playerName}!</p>
             </div>
             <div className="text-right">
               <div className="flex items-center space-x-2">
                 <Users className="h-4 w-4 text-gray-500" />
-                <span className="text-sm text-gray-600">8/10 players</span>
+                <span className="text-sm text-gray-600">
+                  {sessionData?.players ? Object.keys(sessionData.players).length : 1}/{sessionData?.maxPlayers || 10} players
+                </span>
               </div>
             </div>
           </div>
         </div>
 
         {/* Current Song */}
-        {currentSong && (
-          <div className="bg-gradient-to-r from-purple-500 to-cyan-500 rounded-2xl p-4 mb-4 text-white shadow-lg">
+        {sessionData?.currentSong && (
+          <div className="bg-gradient-to-r from-purple-500 to-cyan-500 rounded-2xl p-4 mb-4 text-white shadow-lg animate-pulse">
             <div className="flex items-center space-x-3">
               <div className="bg-white/20 p-2 rounded-full">
                 <Volume2 className="h-6 w-6" />
               </div>
               <div>
                 <p className="font-semibold">Now Playing</p>
-                <p className="text-white/90">{currentSong.title} - {currentSong.artist}</p>
+                <p className="text-white/90">{sessionData.currentSong.title} - {sessionData.currentSong.artist}</p>
               </div>
             </div>
           </div>
         )}
 
         {/* Bingo Card */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-800 flex items-center">
-              <Grid3X3 className="h-5 w-5 mr-2" />
-              Your Bingo Card
-            </h3>
-            {checkBingo() && (
-              <div className="bg-yellow-500 text-white px-3 py-1 rounded-full text-sm font-semibold animate-pulse">
-                <Trophy className="h-4 w-4 inline mr-1" />
-                BINGO!
-              </div>
-            )}
+        {bingoCard && (
+          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center">
+                <Grid3X3 className="h-5 w-5 mr-2" />
+                Your Bingo Card
+              </h3>
+              {hasBingo && (
+                <div className="bg-yellow-500 text-white px-3 py-1 rounded-full text-sm font-semibold animate-bounce">
+                  <Trophy className="h-4 w-4 inline mr-1" />
+                  BINGO!
+                </div>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-5 gap-2">
+              {bingoCard.map((row, rowIndex) =>
+                row.map((cell, colIndex) => {
+                  const cellId = `${rowIndex}-${colIndex}`;
+                  const isSelected = selectedCells.has(cellId);
+                  const isFree = cell.type === 'free';
+                  
+                  return (
+                    <button
+                      key={cellId}
+                      onClick={() => toggleCell(rowIndex, colIndex)}
+                      className={`aspect-square p-2 rounded-lg text-xs font-medium transition-all transform hover:scale-105 ${
+                        isFree
+                          ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white'
+                          : isSelected
+                          ? 'bg-gradient-to-br from-purple-500 to-cyan-500 text-white shadow-lg'
+                          : 'bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="leading-tight">{cell.text}</div>
+                      {cell.artist && <div className="text-xs opacity-75 mt-1">{cell.artist}</div>}
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
-          
-          <div className="grid grid-cols-5 gap-2">
-            {bingoCard.map((row, rowIndex) =>
-              row.map((cell, colIndex) => {
-                const cellId = `${rowIndex}-${colIndex}`;
-                const isSelected = selectedCells.has(cellId);
-                const isFree = cell.includes('FREE');
-                
-                return (
-                  <button
-                    key={cellId}
-                    onClick={() => toggleCell(rowIndex, colIndex)}
-                    className={`aspect-square p-2 rounded-lg text-xs font-medium transition-all transform hover:scale-105 ${
-                      isFree
-                        ? 'bg-gradient-to-br from-yellow-400 to-orange-500 text-white'
-                        : isSelected
-                        ? 'bg-gradient-to-br from-purple-500 to-cyan-500 text-white shadow-lg'
-                        : 'bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100'
-                    }`}
-                  >
-                    {cell}
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
+        )}
 
         {/* Action Buttons */}
         <div className="mt-4 flex space-x-2">
-          <button className="flex-1 bg-green-500 text-white py-3 rounded-xl font-semibold hover:bg-green-600 transition-colors">
+          <button 
+            className={`flex-1 py-3 rounded-xl font-semibold transition-colors ${
+              hasBingo 
+                ? 'bg-green-500 text-white hover:bg-green-600' 
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
+            disabled={!hasBingo}
+          >
             <Trophy className="h-4 w-4 inline mr-2" />
             Call Bingo!
           </button>
-          <button className="px-4 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors">
+          <button 
+            onClick={() => setCurrentView('login')}
+            className="px-4 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors"
+          >
             <MessageCircle className="h-4 w-4" />
           </button>
         </div>
@@ -212,11 +399,11 @@ const BeatsAndBingo = () => {
   // Admin Setup Screen
   const AdminSetupScreen = () => (
     <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-100 p-4">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-4xl mx-auto">
         <div className="bg-white/90 backdrop-blur-sm rounded-3xl p-8 shadow-2xl">
           <h2 className="text-3xl font-bold text-gray-800 mb-8 text-center">Create New Session</h2>
           
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-2 gap-8">
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Session Name</label>
@@ -253,9 +440,6 @@ const BeatsAndBingo = () => {
                   <option value="rock">Classic Rock</option>
                   <option value="pop">Pop Hits</option>
                   <option value="hiphop">Hip Hop</option>
-                  <option value="country">Country</option>
-                  <option value="electronic">Electronic</option>
-                  <option value="mixed">Mixed Genre</option>
                 </select>
               </div>
 
@@ -289,39 +473,31 @@ const BeatsAndBingo = () => {
             <div className="space-y-6">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">Playlist Preview</label>
-                <div className="bg-gray-50 rounded-xl p-4 h-48 overflow-y-auto">
+                <div className="bg-gray-50 rounded-xl p-4 h-64 overflow-y-auto">
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between items-center p-2 bg-white rounded-lg">
-                      <span>Bohemian Rhapsody</span>
-                      <span className="text-gray-500">Queen</span>
-                    </div>
-                    <div className="flex justify-between items-center p-2 bg-white rounded-lg">
-                      <span>Sweet Child O' Mine</span>
-                      <span className="text-gray-500">Guns N' Roses</span>
-                    </div>
-                    <div className="flex justify-between items-center p-2 bg-white rounded-lg">
-                      <span>Hotel California</span>
-                      <span className="text-gray-500">Eagles</span>
-                    </div>
+                    {(genrePlaylists[adminData.genre] || genrePlaylists.rock).slice(0, 10).map((song) => (
+                      <div key={song.id} className="flex justify-between items-center p-2 bg-white rounded-lg">
+                        <span className="font-medium">{song.title}</span>
+                        <span className="text-gray-500">{song.artist}</span>
+                      </div>
+                    ))}
                     <div className="text-center text-gray-400 p-2">
-                      + 47 more songs...
+                      + {(genrePlaylists[adminData.genre] || genrePlaylists.rock).length - 10} more songs...
                     </div>
                   </div>
                 </div>
               </div>
-
-              <button className="w-full bg-gray-200 text-gray-700 py-3 rounded-xl font-semibold hover:bg-gray-300 transition-colors">
-                Import from Spotify
-              </button>
             </div>
           </div>
 
           <div className="mt-8 flex space-x-4">
             <button
-              onClick={() => setCurrentView('admin-dashboard')}
-              className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 text-white py-4 rounded-xl font-semibold hover:shadow-lg transition-all transform hover:scale-105"
+              onClick={handleCreateSession}
+              disabled={!adminData.sessionName || loading}
+              className="flex-1 bg-gradient-to-r from-blue-500 to-purple-500 text-white py-4 rounded-xl font-semibold disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg transition-all transform hover:scale-105"
             >
-              Create Session
+              <Save className="h-4 w-4 inline mr-2" />
+              {loading ? 'Creating...' : 'Create Session'}
             </button>
             <button
               onClick={() => setCurrentView('login')}
@@ -346,20 +522,116 @@ const BeatsAndBingo = () => {
             <div className="space-y-3">
               <div className="flex justify-between">
                 <span className="text-gray-600">Session ID:</span>
-                <span className="font-mono font-bold">ABC123</span>
+                <span className="font-mono font-bold">{sessionId}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Players:</span>
-                <span className="font-semibold">8/10</span>
+                <span className="font-semibold">
+                  {sessionData?.players ? Object.keys(sessionData.players).length : 0}/{sessionData?.maxPlayers || 10}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Genre:</span>
-                <span className="capitalize">{adminData.genre}</span>
+                <span className="capitalize">{sessionData?.genre || adminData.genre}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Status:</span>
                 <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-sm">Active</span>
               </div>
+            </div>
+          </div>
+
+          {/* Game Controls */}
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">Game Controls</h3>
+            <div className="space-y-4">
+              <button
+                onClick={() => {
+                  if (sessionData?.playlist && sessionData.playlist.length > 0) {
+                    const randomSong = sessionData.playlist[Math.floor(Math.random() * sessionData.playlist.length)];
+                    handlePlaySong(randomSong);
+                  }
+                }}
+                className="w-full bg-green-500 text-white py-3 rounded-xl font-semibold hover:bg-green-600 transition-colors flex items-center justify-center"
+              >
+                <Play className="h-4 w-4 mr-2" />
+                Play Random Song
+              </button>
+              
+              <button 
+                className="w-full bg-blue-500 text-white py-3 rounded-xl font-semibold hover:bg-blue-600 transition-colors flex items-center justify-center"
+                onClick={() => handlePlaySong(null)}
+              >
+                <Pause className="h-4 w-4 mr-2" />
+                Stop Music
+              </button>
+              
+              <button 
+                className="w-full bg-yellow-500 text-white py-3 rounded-xl font-semibold hover:bg-yellow-600 transition-colors flex items-center justify-center"
+                onClick={() => {
+                  if (sessionData?.playlist && sessionData.playlist.length > 0) {
+                    const randomSong = sessionData.playlist[Math.floor(Math.random() * sessionData.playlist.length)];
+                    handlePlaySong(randomSong);
+                  }
+                }}
+              >
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Next Song
+              </button>
+              
+              <button 
+                onClick={() => setCurrentView('login')}
+                className="w-full bg-red-500 text-white py-3 rounded-xl font-semibold hover:bg-red-600 transition-colors"
+              >
+                End Session
+              </button>
+            </div>
+          </div>
+
+          {/* Current Song Display */}
+          <div className="bg-gradient-to-r from-purple-500 to-blue-500 rounded-2xl p-6 text-white shadow-lg">
+            <h3 className="text-xl font-bold mb-4 flex items-center">
+              <Music className="h-5 w-5 mr-2" />
+              Now Playing
+            </h3>
+            {sessionData?.currentSong ? (
+              <div>
+                <p className="text-2xl font-bold">{sessionData.currentSong.title}</p>
+                <p className="text-white/80 text-lg">{sessionData.currentSong.artist}</p>
+                <div className="mt-4 bg-white/20 rounded-full h-2">
+                  <div className="bg-white rounded-full h-2 w-1/3 transition-all"></div>
+                </div>
+              </div>
+            ) : (
+              <p className="text-white/80">No song playing - Ready to start!</p>
+            )}
+          </div>
+
+          {/* Playlist Management */}
+          <div className="lg:col-span-2 bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">Playlist</h3>
+            <div className="h-64 overflow-y-auto space-y-2">
+              {sessionData?.playlist ? sessionData.playlist.slice(0, 15).map((song) => (
+                <div key={song.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                  <div>
+                    <div className="font-medium text-sm">{song.title}</div>
+                    <div className="text-xs text-gray-500">{song.artist}</div>
+                  </div>
+                  <button
+                    onClick={() => handlePlaySong(song)}
+                    className="bg-blue-500 text-white px-3 py-1 rounded text-xs hover:bg-blue-600 transition-colors"
+                  >
+                    Play
+                  </button>
+                </div>
+              )) : (
+                <div className="text-gray-500 text-center py-4">No playlist loaded</div>
+              )}
+              {sessionData?.playlist && sessionData.playlist.length > 15 && (
+                <div className="text-center text-gray-400 py-2">
+                  + {sessionData.playlist.length - 15} more songs
+                </div>
+              )}
             </div>
           </div>
 
@@ -370,85 +642,17 @@ const BeatsAndBingo = () => {
               Players
             </h3>
             <div className="space-y-2">
-              {['Alex', 'Sarah', 'Mike', 'Emma', 'Chris', 'Luna', 'David', 'Maya'].map((name, i) => (
-                <div key={i} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                  <span className="font-medium">{name}</span>
+              {sessionData?.players ? Object.values(sessionData.players).map((player) => (
+                <div key={player.id} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                  <span className="font-medium">{player.name}</span>
                   <div className="flex items-center space-x-2">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                     <span className="text-xs text-gray-500">Online</span>
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Game Controls */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Game Controls</h3>
-            <div className="space-y-4">
-              <button
-                onClick={() => setCurrentSong({title: 'Bohemian Rhapsody', artist: 'Queen'})}
-                className="w-full bg-green-500 text-white py-3 rounded-xl font-semibold hover:bg-green-600 transition-colors flex items-center justify-center"
-              >
-                <Play className="h-4 w-4 mr-2" />
-                Start Game
-              </button>
-              
-              <button className="w-full bg-blue-500 text-white py-3 rounded-xl font-semibold hover:bg-blue-600 transition-colors flex items-center justify-center">
-                <Pause className="h-4 w-4 mr-2" />
-                Pause
-              </button>
-              
-              <button className="w-full bg-yellow-500 text-white py-3 rounded-xl font-semibold hover:bg-yellow-600 transition-colors flex items-center justify-center">
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Next Song
-              </button>
-              
-              <button className="w-full bg-red-500 text-white py-3 rounded-xl font-semibold hover:bg-red-600 transition-colors">
-                End Session
-              </button>
-            </div>
-          </div>
-
-          {/* Current Song Display */}
-          <div className="lg:col-span-2 bg-gradient-to-r from-purple-500 to-blue-500 rounded-2xl p-6 text-white shadow-lg">
-            <h3 className="text-xl font-bold mb-4 flex items-center">
-              <Music className="h-5 w-5 mr-2" />
-              Now Playing
-            </h3>
-            {currentSong ? (
-              <div>
-                <p className="text-2xl font-bold">{currentSong.title}</p>
-                <p className="text-white/80 text-lg">{currentSong.artist}</p>
-                <div className="mt-4 bg-white/20 rounded-full h-2">
-                  <div className="bg-white rounded-full h-2 w-1/3 transition-all"></div>
-                </div>
-              </div>
-            ) : (
-              <p className="text-white/80">No song playing - Ready to start!</p>
-            )}
-          </div>
-
-          {/* Quick Stats */}
-          <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 shadow-lg">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">Game Stats</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-3 bg-blue-50 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">3</div>
-                <div className="text-sm text-gray-600">Songs Played</div>
-              </div>
-              <div className="text-center p-3 bg-green-50 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">0</div>
-                <div className="text-sm text-gray-600">Bingos</div>
-              </div>
-              <div className="text-center p-3 bg-purple-50 rounded-lg">
-                <div className="text-2xl font-bold text-purple-600">12:34</div>
-                <div className="text-sm text-gray-600">Game Time</div>
-              </div>
-              <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                <div className="text-2xl font-bold text-yellow-600">47</div>
-                <div className="text-sm text-gray-600">Total Songs</div>
-              </div>
+              )) : (
+                <div className="text-gray-500 text-center py-4">No players yet</div>
+              )}
             </div>
           </div>
         </div>
@@ -471,4 +675,4 @@ const BeatsAndBingo = () => {
   }
 };
 
-export default BeatsAndBingo;
+export default BeatsAndBingo;​​​​​​​​​​​​​​​​
